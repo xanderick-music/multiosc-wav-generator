@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multi-Osc Loop Synth</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #020c04;
+      --surface: #060e08;
+      --border:  #1a3020;
+      --accent:  #00e070;
+      --accent2: #00aa55;
+      --muted:   #3a5a44;
+      --dim:     #2a4a32;
+      --warn:    #cc8800;
+      --danger:  #cc3344;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--accent);
+      font-family: 'Courier New', Courier, monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 48px;
+    }
+
+    header {
+      width: 100%;
+      max-width: 780px;
+      margin-bottom: 28px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 16px;
+    }
+    header h1 {
+      font-size: 13px;
+      letter-spacing: .18em;
+      color: var(--accent);
+      font-weight: normal;
+      margin-bottom: 4px;
+    }
+    header p {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: .06em;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 780px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+    }
+
+    /* ── Controls ─────────────────────────────────────── */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .top-label { font-size: 10px; color: var(--dim); letter-spacing: .12em; }
+    #ls { font-size: 10px; color: var(--muted); }
+
+    canvas#cv {
+      width: 100%; height: 200px;
+      display: block;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #030b05;
+      margin-bottom: 10px;
+    }
+
+    .info-bar {
+      display: flex; gap: 16px; flex-wrap: wrap; align-items: center;
+      font-size: 10px; color: var(--dim);
+      margin-bottom: 16px;
+    }
+    .info-bar span.v { color: var(--accent); }
+    .info-bar span.note { color: var(--accent2); font-size: 11px; }
+    #st { margin-left: auto; font-size: 10px; }
+
+    .globals {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+      background: #040a06; border: 1px solid var(--border);
+      border-radius: 8px; padding: 14px; margin-bottom: 14px;
+    }
+    .sl { font-size: 10px; color: var(--muted); letter-spacing: .07em; margin-bottom: 4px; display: flex; justify-content: space-between; }
+    .sl .sv { color: var(--accent); font-family: 'Courier New', monospace; }
+    .srow { display: flex; align-items: center; gap: 6px; }
+    input[type=range] { flex: 1; min-width: 0; accent-color: var(--accent); cursor: pointer; height: 20px; }
+
+    /* Osc cards */
+    #list { }
+    .oc {
+      background: #040a06; border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px; margin-bottom: 10px;
+    }
+    .oc-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+    .badge { background: #0a1a0d; border: 1px solid #1d3822; border-radius: 4px; padding: 2px 8px; font-size: 12px; color: var(--accent); }
+    .ofreq { font-size: 10px; color: var(--dim); }
+    .cbadge { font-size: 10px; color: var(--warn); }
+    .oc-head .right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+
+    .oc-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    @media (max-width: 540px) { .oc-grid { grid-template-columns: repeat(2, 1fr); } }
+
+    .oc-grid .sl { font-size: 10px; }
+    input[type=number] {
+      background: #050d07; color: var(--accent);
+      border: 1px solid #1d3822; border-radius: 3px;
+      font-family: 'Courier New', monospace; font-size: 11px;
+      padding: 2px 3px; width: 50px; text-align: right; min-width: 0;
+    }
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { opacity: .5; }
+
+    select {
+      background: #050d07; color: var(--accent);
+      border: 1px solid #1d3822; border-radius: 4px;
+      padding: 4px 6px; font-family: 'Courier New', monospace;
+      font-size: 12px; cursor: pointer;
+    }
+
+    /* Buttons */
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+    button {
+      font-family: 'Courier New', monospace; cursor: pointer;
+      border-radius: 6px; font-size: 12px;
+    }
+    #btn-play { background: var(--accent); color: #010e04; border: none; padding: 9px 24px; font-size: 13px; font-weight: bold; }
+    .bsec { background: transparent; color: var(--accent); border: 1px solid #1d3822; padding: 9px 16px; }
+    .bdel { background: transparent; color: var(--danger); border: 1px solid #3a1820; border-radius: 4px; padding: 3px 8px; font-size: 11px; }
+
+    footer {
+      margin-top: 32px;
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: .06em;
+      text-align: center;
+      opacity: .6;
+    }
+    footer a { color: var(--muted); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>MULTI-OSC LOOP SYNTH</h1>
+  <p>Fine-pitch multioscillator — smart loop export via GCD phase alignment</p>
+</header>
+
+<div class="card">
+
+  <div class="top-bar">
+    <span class="top-label">WAVEFORM SCOPE</span>
+    <span id="ls">⊙ PHASES ALIGNED ON EXPORT</span>
+  </div>
+
+  <canvas id="cv"></canvas>
+
+  <div class="info-bar">
+    BASE <span class="v" id="ihz">110 Hz</span>
+    <span class="note" id="inote">(A2)</span>
+    OSC <span class="v" id="icnt">0</span>
+    LOOP <span id="ilp" style="color:var(--muted)">—</span>
+    <span id="st"></span>
+  </div>
+
+  <div class="globals">
+    <div>
+      <div class="sl">
+        BASE FREQUENCY
+        <span id="note" style="color:var(--accent2);font-size:12px;font-weight:500;">A2</span>
+      </div>
+      <div class="srow">
+        <input type="range" id="sbase" min="20" max="800" value="110" step="1">
+        <span id="vbase" style="color:var(--accent);font-size:12px;white-space:nowrap;min-width:54px;text-align:right;">110 Hz</span>
+      </div>
+    </div>
+    <div>
+      <div class="sl">MASTER VOLUME <span class="sv"><span id="vvol">70</span>%</span></div>
+      <div class="srow">
+        <input type="range" id="svol" min="0" max="100" value="70" step="1">
+      </div>
+    </div>
+  </div>
+
+  <div id="list"></div>
+
+  <div class="btn-row">
+    <button id="btn-play">▶ PLAY</button>
+    <button class="bsec" id="btn-add">+ ADD OSC</button>
+    <button class="bsec" id="btn-exp">⬇ EXPORT WAV</button>
+  </div>
+
+</div>
+
+<footer>built with Web Audio API &nbsp;·&nbsp; <a href="https://github.com" target="_blank">host on github pages</a></footer>
+
+<script>
+(function () {
+  const SR = 44100;
+  let baseFreq = 110, masterVol = 0.7;
+  let oscs = [], nid = 0;
+  let actx = null, anodes = [], isPlay = false;
+  let scanT = 0, lastRaf = 0;
+
+  const TYPES  = ['sine','square','sawtooth','triangle'];
+  const NNAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+  const $ = id => document.getElementById(id);
+
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+  function freqToNote(hz) {
+    const midi = 12 * Math.log2(hz / 440) + 69;
+    const mR   = Math.round(midi);
+    const cents = Math.round((midi - mR) * 100);
+    const oct  = Math.floor(mR / 12) - 1;
+    const name = NNAMES[((mR % 12) + 12) % 12] + oct;
+    if (cents === 0) return name;
+    return name + (cents > 0 ? ' +' : ' ') + cents + '¢';
+  }
+
+  function mkOsc(id) { return { id, type: 'sine', harm: 1, cents: 0, amp: 0.8, phase: 0 }; }
+  function oscFreq(o) { return baseFreq * o.harm * Math.pow(2, o.cents / 1200); }
+
+  /* ── Float-GCD loop length ─────────────────────────────────────────────── */
+  function fgcd(a, b) {
+    const eps = 5e-4; let n = 0;
+    while (b > eps && n++ < 4000) { [a, b] = [b, a - Math.floor(a / b) * b]; }
+    return Math.max(a, eps);
+  }
+  function computeLoop() {
+    if (!oscs.length) return { n: Math.round(SR / baseFreq), sec: 1 / baseFreq, capped: false };
+    const freqs = oscs.map(oscFreq);
+    let g = freqs[0];
+    for (let i = 1; i < freqs.length; i++) {
+      const a = Math.max(g, freqs[i]), b = Math.min(g, freqs[i]);
+      g = fgcd(a, b);
+    }
+    const sec = 1 / g, n = Math.round(sec * SR);
+    if (n > 30 * SR) return { n: 30 * SR, sec: 30, capped: true };
+    return { n, sec, capped: false };
+  }
+
+  /* ── Oscillator sampler ────────────────────────────────────────────────── */
+  function oscSamp(o, t) {
+    const f = oscFreq(o), ph = o.phase;
+    switch (o.type) {
+      case 'sine':     return Math.sin(2 * Math.PI * f * t + ph * 2 * Math.PI);
+      case 'square':   return Math.sign(Math.sin(2 * Math.PI * f * t + ph * 2 * Math.PI)) || 0;
+      case 'sawtooth': { let p = (f * t + ph) % 1; if (p < 0) p++; return 2 * p - 1; }
+      case 'triangle': { let p = (f * t + ph) % 1; if (p < 0) p++; return 4 * Math.abs(p - 0.5) - 1; }
+    }
+  }
+
+  function buildBuf(n) {
+    const buf = new Float32Array(n);
+    if (!oscs.length) return buf;
+    for (let i = 0; i < n; i++) { let v = 0; for (const o of oscs) v += o.amp * oscSamp(o, i / SR); buf[i] = v; }
+    let pk = 0; for (const s of buf) if (Math.abs(s) > pk) pk = Math.abs(s);
+    if (pk > 1e-6) for (let i = 0; i < n; i++) buf[i] /= pk;
+    return buf;
+  }
+
+  /* ── Scope ─────────────────────────────────────────────────────────────── */
+  function drawScope(tOff) {
+    tOff = tOff || 0;
+    const cv = $('cv'); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1;
+    const W = cv.clientWidth, H = cv.clientHeight; if (!W) return;
+    cv.width = W * dpr; cv.height = H * dpr;
+    const cx = cv.getContext('2d'); cx.scale(dpr, dpr);
+
+    cx.fillStyle = '#030b05'; cx.fillRect(0, 0, W, H);
+    cx.strokeStyle = '#091509'; cx.lineWidth = .5;
+    for (let i = 1; i < 4; i++) { cx.beginPath(); cx.moveTo(0, H * i / 4); cx.lineTo(W, H * i / 4); cx.stroke(); }
+    for (let i = 1; i < 8; i++) { cx.beginPath(); cx.moveTo(W * i / 8, 0); cx.lineTo(W * i / 8, H); cx.stroke(); }
+    cx.strokeStyle = '#112a18'; cx.lineWidth = .8;
+    cx.beginPath(); cx.moveTo(0, H / 2); cx.lineTo(W, H / 2); cx.stroke();
+
+    if (!oscs.length) {
+      cx.fillStyle = '#1a4a24'; cx.font = '11px Courier New'; cx.textAlign = 'center';
+      cx.fillText('NO SIGNAL  —  ADD AN OSCILLATOR', W / 2, H / 2 + 4); return;
+    }
+
+    const span = 3 / baseFreq;
+    const totalAmp = Math.max(1e-6, oscs.reduce((s, o) => s + o.amp, 0));
+
+    for (const o of oscs) {
+      cx.beginPath(); cx.strokeStyle = 'rgba(0,190,65,.18)'; cx.lineWidth = 1;
+      for (let px = 0; px < W; px++) {
+        const t = tOff + (px / W) * span;
+        const v = (o.amp / totalAmp) * oscSamp(o, t);
+        const y = H / 2 - v * H * .41;
+        px === 0 ? cx.moveTo(px, y) : cx.lineTo(px, y);
+      }
+      cx.stroke();
+    }
+
+    cx.beginPath(); cx.strokeStyle = '#00ff70'; cx.lineWidth = 2.5;
+    cx.shadowColor = '#00cc55'; cx.shadowBlur = 7;
+    for (let px = 0; px < W; px++) {
+      const t = tOff + (px / W) * span;
+      let v = 0; for (const o of oscs) v += o.amp * oscSamp(o, t);
+      const y = H / 2 - (v / totalAmp) * H * .41;
+      px === 0 ? cx.moveTo(px, y) : cx.lineTo(px, y);
+    }
+    cx.stroke(); cx.shadowBlur = 0;
+
+    const pxS = W / span, bp = 1 / baseFreq;
+    cx.strokeStyle = 'rgba(200,100,0,.4)'; cx.lineWidth = 1; cx.setLineDash([4, 4]);
+    for (let i = 1; i * bp < span; i++) {
+      const px = (i * bp - (tOff % bp)) * pxS;
+      if (px > 0 && px < W) { cx.beginPath(); cx.moveTo(px, 0); cx.lineTo(px, H); cx.stroke(); }
+    }
+    cx.setLineDash([]);
+    cx.font = '9px Courier New'; cx.textAlign = 'right'; cx.fillStyle = '#1a4a30';
+    cx.fillText(baseFreq + 'Hz', W - 6, H - 6);
+  }
+
+  /* ── Info bar ──────────────────────────────────────────────────────────── */
+  function fmtSec(s) { return s < 0.01 ? (s * 1000).toFixed(2) + 'ms' : s < 1 ? (s * 1000).toFixed(1) + 'ms' : s.toFixed(3) + 's'; }
+
+  function updateInfo() {
+    const note = freqToNote(baseFreq);
+    $('ihz').textContent   = baseFreq + ' Hz';
+    $('inote').textContent = '(' + note + ')';
+    $('note').textContent  = note;
+    $('vbase').textContent = baseFreq + ' Hz';
+    $('icnt').textContent  = oscs.length;
+    const lp = $('ilp');
+    if (!oscs.length) { lp.textContent = '—'; lp.style.color = 'var(--muted)'; return; }
+    const { n, sec, capped } = computeLoop();
+    lp.textContent = fmtSec(sec) + ' / ' + n.toLocaleString() + ' smp' + (capped ? ' ⚠' : ' ✓');
+    lp.style.color = capped ? 'var(--warn)' : 'var(--accent)';
+  }
+
+  /* ── Oscillator list ───────────────────────────────────────────────────── */
+  function syncSiblings(src, id, p, val) {
+    document.querySelectorAll(`#list [data-id="${id}"][data-p="${p}"]`).forEach(el => {
+      if (el !== src) el.value = val;
+    });
+  }
+
+  function renderList() {
+    const el = $('list'); el.innerHTML = '';
+    oscs.forEach((osc, idx) => {
+      const d = document.createElement('div');
+      d.className = 'oc';
+      const fq = oscFreq(osc).toFixed(3);
+      const cStr = (osc.cents > 0 ? '+' : '') + osc.cents;
+      const harmOpts = Array.from({ length: 16 }, (_, i) => i + 1)
+        .map(h => `<option value="${h}"${h === osc.harm ? ' selected' : ''}>${h}×</option>`).join('');
+      d.innerHTML = `
+        <div class="oc-head">
+          <span class="badge">OSC ${idx + 1}</span>
+          <span class="ofreq" data-ofreq="${osc.id}">${fq} Hz</span>
+          <span class="cbadge" data-cbadge="${osc.id}" style="display:${osc.cents !== 0 ? 'inline' : 'none'};">${cStr}¢</span>
+          <div class="right">
+            <span style="font-size:10px;color:var(--muted);">WAVE</span>
+            <select data-id="${osc.id}" data-p="type">${TYPES.map(t => `<option value="${t}"${t === osc.type ? ' selected' : ''}>${t.toUpperCase()}</option>`).join('')}</select>
+            <button class="bdel" data-id="${osc.id}" data-a="del">✕</button>
+          </div>
+        </div>
+        <div class="oc-grid">
+          <div>
+            <div class="sl">HARMONIC</div>
+            <select data-id="${osc.id}" data-p="harm" style="width:100%;background:#050d07;color:var(--accent);border:1px solid #1d3822;border-radius:4px;padding:4px 5px;font-family:'Courier New',monospace;font-size:12px;">${harmOpts}</select>
+          </div>
+          <div>
+            <div class="sl">FINE  ¢</div>
+            <div class="srow">
+              <input type="range"  data-id="${osc.id}" data-p="cents" min="-100" max="100" step="1" value="${osc.cents}">
+              <input type="number" data-id="${osc.id}" data-p="cents" min="-100" max="100" step="1" value="${osc.cents}">
+            </div>
+          </div>
+          <div>
+            <div class="sl">AMPLITUDE  %</div>
+            <div class="srow">
+              <input type="range"  data-id="${osc.id}" data-p="amp" min="0" max="100" step="1" value="${Math.round(osc.amp * 100)}">
+              <input type="number" data-id="${osc.id}" data-p="amp" min="0" max="100" step="1" value="${Math.round(osc.amp * 100)}">
+            </div>
+          </div>
+          <div>
+            <div class="sl">PHASE  °</div>
+            <div class="srow">
+              <input type="range"  data-id="${osc.id}" data-p="phase" min="0" max="360" step="1" value="${Math.round(osc.phase * 360)}">
+              <input type="number" data-id="${osc.id}" data-p="phase" min="0" max="360" step="1" value="${Math.round(osc.phase * 360)}">
+            </div>
+          </div>
+        </div>`;
+      el.appendChild(d);
+    });
+
+    el.querySelectorAll('[data-p]').forEach(e => {
+      const ev = e.tagName === 'SELECT' ? 'change' : 'input';
+      e.addEventListener(ev, handleParam);
+    });
+    el.querySelectorAll('[data-a="del"]').forEach(e => {
+      e.addEventListener('click', () => {
+        oscs = oscs.filter(o => o.id !== +e.dataset.id);
+        if (isPlay) restartAudio();
+        renderList(); drawScope(); updateInfo();
+      });
+    });
+  }
+
+  function handleParam(e) {
+    const id = +e.target.dataset.id, p = e.target.dataset.p;
+    const osc = oscs.find(o => o.id === id); if (!osc) return;
+    const raw = parseFloat(e.target.value) || 0;
+
+    if      (p === 'type') { osc.type = e.target.value; }
+    else if (p === 'harm') { osc.harm = +e.target.value; }
+    else if (p === 'cents') {
+      osc.cents = clamp(Math.round(raw), -100, 100);
+      e.target.value = osc.cents;
+      syncSiblings(e.target, id, 'cents', osc.cents);
+      const cb = document.querySelector(`[data-cbadge="${id}"]`);
+      if (cb) { cb.textContent = (osc.cents > 0 ? '+' : '') + osc.cents + '¢'; cb.style.display = osc.cents !== 0 ? 'inline' : 'none'; }
+    }
+    else if (p === 'amp') {
+      osc.amp = clamp(Math.round(raw), 0, 100) / 100;
+      e.target.value = Math.round(osc.amp * 100);
+      syncSiblings(e.target, id, 'amp', Math.round(osc.amp * 100));
+    }
+    else if (p === 'phase') {
+      osc.phase = clamp(Math.round(raw), 0, 360) / 360;
+      e.target.value = Math.round(osc.phase * 360);
+      syncSiblings(e.target, id, 'phase', Math.round(osc.phase * 360));
+    }
+
+    const fq = document.querySelector(`[data-ofreq="${id}"]`);
+    if (fq) fq.textContent = oscFreq(osc).toFixed(3) + ' Hz';
+    if (isPlay) restartAudio();
+    drawScope(scanT); updateInfo();
+  }
+
+  /* ── Audio ─────────────────────────────────────────────────────────────── */
+  function startAudio() {
+    if (!actx) actx = new AudioContext();
+    else if (actx.state === 'suspended') actx.resume();
+    const master = actx.createGain();
+    master.gain.value = masterVol;
+    master.connect(actx.destination);
+    anodes.push(master);
+    const totalAmp = Math.max(1e-6, oscs.reduce((s, o) => s + o.amp, 0));
+    const now = actx.currentTime;
+    for (const o of oscs) {
+      const f = oscFreq(o);
+      const node = actx.createOscillator();
+      node.type = o.type; node.frequency.value = f;
+      const gain = actx.createGain();
+      gain.gain.value = o.amp / totalAmp;
+      node.connect(gain); gain.connect(master);
+      node.start(Math.max(0, now - o.phase / f));
+      anodes.push(node, gain);
+    }
+  }
+  function stopAudio() { anodes.forEach(n => { try { n.stop(); n.disconnect(); } catch (e) {} }); anodes = []; }
+  function restartAudio() { stopAudio(); if (isPlay) startAudio(); }
+
+  /* ── WAV encoder ───────────────────────────────────────────────────────── */
+  function encWAV(samp, sr) {
+    const buf = new ArrayBuffer(44 + samp.length * 2);
+    const v = new DataView(buf);
+    const ws = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    ws(0, 'RIFF'); v.setUint32(4, 36 + samp.length * 2, true);
+    ws(8, 'WAVE'); ws(12, 'fmt '); v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true);
+    v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    ws(36, 'data'); v.setUint32(40, samp.length * 2, true);
+    let off = 44;
+    for (const s of samp) { v.setInt16(off, Math.max(-1, Math.min(1, s)) * 0x7FFF, true); off += 2; }
+    return buf;
+  }
+
+  function setStatus(m, c) {
+    const el = $('st'); el.textContent = m; el.style.color = c || 'var(--warn)';
+    clearTimeout(el._t); el._t = setTimeout(() => el.textContent = '', 5000);
+  }
+
+  /* ── UI events ─────────────────────────────────────────────────────────── */
+  $('btn-play').addEventListener('click', () => {
+    if (!oscs.length) { setStatus('Add an oscillator first'); return; }
+    isPlay = !isPlay;
+    const btn = $('btn-play'), ls = $('ls');
+    if (isPlay) {
+      startAudio();
+      btn.textContent = '■ STOP'; btn.style.background = 'var(--danger)'; btn.style.color = '#fff';
+      ls.textContent = '● LIVE'; ls.style.color = 'var(--accent)';
+    } else {
+      stopAudio();
+      btn.textContent = '▶ PLAY'; btn.style.background = 'var(--accent)'; btn.style.color = '#010e04';
+      ls.textContent = '⊙ PHASES ALIGNED ON EXPORT'; ls.style.color = 'var(--muted)';
+      scanT = 0; drawScope(0);
+    }
+  });
+
+  $('btn-add').addEventListener('click', () => {
+    const o = mkOsc(nid++);
+    o.harm = Math.min(16, oscs.length + 1);
+    o.type = ['sine', 'triangle', 'sawtooth', 'square'][oscs.length % 4];
+    o.amp  = Math.max(0.3, 0.85 - oscs.length * 0.12);
+    oscs.push(o);
+    if (isPlay) restartAudio();
+    renderList(); drawScope(); updateInfo();
+  });
+
+  $('sbase').addEventListener('input', function () {
+    baseFreq = +this.value;
+    oscs.forEach(o => {
+      const el = document.querySelector(`[data-ofreq="${o.id}"]`);
+      if (el) el.textContent = oscFreq(o).toFixed(3) + ' Hz';
+    });
+    if (isPlay) restartAudio();
+    drawScope(scanT); updateInfo();
+  });
+
+  $('svol').addEventListener('input', function () {
+    masterVol = +this.value / 100;
+    $('vvol').textContent = this.value;
+    if (isPlay) restartAudio();
+  });
+
+  $('btn-exp').addEventListener('click', () => {
+    if (!oscs.length) { setStatus('No oscillators to export'); return; }
+    const { n, sec, capped } = computeLoop();
+    setStatus('Rendering ' + fmtSec(sec) + '…', '#00aa55');
+    setTimeout(() => {
+      const raw = buildBuf(n);
+      const data = new Float32Array(n);
+      for (let i = 0; i < n; i++) data[i] = raw[i] * masterVol;
+      const wav = encWAV(data, SR);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }));
+      a.download = 'loop_' + baseFreq + 'hz' + (capped ? '_capped' : '') + '.wav';
+      a.click();
+      setStatus('Exported ' + fmtSec(sec) + ' / ' + n.toLocaleString() + ' smp' + (capped ? ' ⚠ CAPPED' : ''), 'var(--accent)');
+    }, 60);
+  });
+
+  /* ── Animation loop ────────────────────────────────────────────────────── */
+  function frame(t) {
+    requestAnimationFrame(frame);
+    const dt = (t - lastRaf) / 1000; lastRaf = t;
+    if (isPlay) {
+      scanT += dt * 0.08; drawScope(scanT);
+      const ls = $('ls');
+      if (ls) ls.style.opacity = .4 + .6 * ((Math.sin(t / 350) + 1) / 2);
+    }
+  }
+  requestAnimationFrame(t => { lastRaf = t; frame(t); });
+
+  /* ── Defaults ──────────────────────────────────────────────────────────── */
+  function add(harm, type, cents, amp, phase) {
+    const o = mkOsc(nid++); o.harm = harm; o.type = type; o.cents = cents; o.amp = amp; o.phase = phase; oscs.push(o);
+  }
+  add(1, 'sine',     0,  0.80, 0.00);
+  add(2, 'triangle', +7, 0.50, 0.25);
+  add(3, 'sawtooth', -5, 0.35, 0.50);
+
+  renderList(); drawScope(); updateInfo();
+})();
+</script>
+</body>
+</html>
